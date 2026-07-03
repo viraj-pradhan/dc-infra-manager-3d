@@ -13,7 +13,8 @@ export const RackView3D: React.FC = () => {
     devices, 
     links, 
     activeDeviceId, 
-    setActiveDeviceId 
+    setActiveDeviceId,
+    updateDevice
   } = useTopologyStore();
 
   // Group devices into cabinets of 10 units each sequentially
@@ -113,7 +114,7 @@ export const RackView3D: React.FC = () => {
         <span>Drag to rotate • Scroll to zoom • Click unit to view details</span>
       </div>
 
-      {/* ── Selected Device Read-Only Detail Card ── */}
+      {/* ── Selected Device Detail Card ── */}
       {activeDevice && (
         <div 
           className="absolute right-4 top-4 z-10 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-200"
@@ -164,6 +165,33 @@ export const RackView3D: React.FC = () => {
               <span className={`font-semibold ${activeDevice.isPowerLost ? 'text-amber-400' : 'text-slate-400'}`}>
                 {activeDevice.isPowerLost ? 'Power Feed Lost' : 'Power Connected'}
               </span>
+            </div>
+
+            {/* Simulation Control Buttons */}
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Outage Simulation</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => updateDevice(activeDevice.id, { isSimulatedDown: !activeDevice.isSimulatedDown })}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-150 active:scale-95 cursor-pointer text-center ${
+                    activeDevice.isSimulatedDown
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                      : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
+                  }`}
+                >
+                  {activeDevice.isSimulatedDown ? 'Cancel Shutdown' : 'Shutdown Unit'}
+                </button>
+                <button
+                  onClick={() => updateDevice(activeDevice.id, { isPowerLost: !activeDevice.isPowerLost })}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-150 active:scale-95 cursor-pointer text-center ${
+                    activeDevice.isPowerLost
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
+                      : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
+                  }`}
+                >
+                  {activeDevice.isPowerLost ? 'Restore Power' : 'Cut Power'}
+                </button>
+              </div>
             </div>
 
             {/* Status Badge */}
