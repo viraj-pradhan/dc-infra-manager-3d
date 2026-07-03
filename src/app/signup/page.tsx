@@ -49,8 +49,7 @@ export default function SignupPage() {
       if (result?.error) {
         setError(result.error);
       } else {
-        router.replace('/');
-        router.refresh();
+        window.location.href = '/';
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');

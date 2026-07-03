@@ -29,8 +29,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error);
       } else {
-        router.replace('/');
-        router.refresh();
+        window.location.href = '/';
       }
     } catch (err: any) {
       setError('An unexpected error occurred. Please try again.');
