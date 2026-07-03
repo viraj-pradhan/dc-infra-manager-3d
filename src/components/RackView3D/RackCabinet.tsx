@@ -89,7 +89,8 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
         const slotHeight = 0.5;
         const verticalSpacing = 0.62;
         const startY = 0.5;
-        const posY = startY + idx * verticalSpacing;
+        const slotIdx = device.rackSlot !== undefined ? device.rackSlot : idx;
+        const posY = startY + slotIdx * verticalSpacing;
 
         const isSelected = activeDeviceId === device.id;
         const deviceColor = getTypeColor(device.type);

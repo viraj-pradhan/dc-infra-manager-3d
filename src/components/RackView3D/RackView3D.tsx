@@ -18,7 +18,9 @@ export const RackView3D: React.FC = () => {
     updateDevice,
     moveDeviceInRack,
     addLink,
-    deleteLink
+    deleteLink,
+    cabinetCount,
+    addRack
   } = useTopologyStore();
 
   // Filter out Firewalls since they are software-only
@@ -33,12 +35,24 @@ export const RackView3D: React.FC = () => {
 
   // Group devices into cabinets of 10 units each sequentially
   const cabinets = useMemo(() => {
-    const cabList: typeof devices3D[] = [];
-    for (let i = 0; i < devices3D.length; i += 10) {
-      cabList.push(devices3D.slice(i, i + 10));
-    }
+    const cabList: typeof devices3D[] = Array.from({ length: cabinetCount }, () => []);
+    
+    devices3D.forEach(d => {
+      const cabIdx = d.rackCabinet !== undefined ? d.rackCabinet : Math.floor(devices3D.indexOf(d) / 10);
+      const slotIdx = d.rackSlot !== undefined ? d.rackSlot : devices3D.indexOf(d) % 10;
+      
+      if (cabIdx < cabinetCount) {
+        cabList[cabIdx].push({ ...d, rackSlot: slotIdx });
+      }
+    });
+
+    // Sort each cabinet's devices by slotIndex so they render in correct order
+    cabList.forEach(cab => {
+      cab.sort((a, b) => (a.rackSlot ?? 0) - (b.rackSlot ?? 0));
+    });
+
     return cabList;
-  }, [devices3D]);
+  }, [devices3D, cabinetCount]);
 
   // Selected device for the overlay panel (ensure it's not a firewall)
   const activeDevice = useMemo(() => {
@@ -123,10 +137,20 @@ export const RackView3D: React.FC = () => {
         />
       </Canvas>
 
-      {/* ── Instruction Overlay Badge ── */}
-      <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md border border-slate-800 px-3.5 py-2 rounded-xl text-[10px] font-semibold tracking-wider text-slate-400 pointer-events-none uppercase flex items-center gap-1.5 shadow-lg">
-        <Info className="w-3.5 h-3.5 text-blue-500" />
-        <span>Drag to rotate • Scroll to zoom • Click unit to view details</span>
+      {/* ── Actions Panel Overlay (Top Left) ── */}
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
+        <div className="bg-black/60 backdrop-blur-md border border-slate-800 px-3.5 py-2 rounded-xl text-[10px] font-semibold tracking-wider text-slate-400 uppercase flex items-center gap-1.5 shadow-lg">
+          <Info className="w-3.5 h-3.5 text-blue-500" />
+          <span>Drag to rotate • Scroll to zoom • Click unit to view details</span>
+        </div>
+        
+        <button
+          onClick={addRack}
+          className="w-fit pointer-events-auto bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-xl border border-blue-500/20 shadow-lg transition duration-150 flex items-center gap-1.5 cursor-pointer animate-in fade-in slide-in-from-left-4"
+        >
+          <Server className="w-3.5 h-3.5" />
+          <span>Add Rack Cabinet</span>
+        </button>
       </div>
 
       {/* ── Selected Device Detail Card ── */}

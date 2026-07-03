@@ -13,6 +13,8 @@ export interface Device {
   position: { x: number; y: number };
   isSimulatedDown?: boolean;
   isPowerLost?: boolean;
+  rackCabinet?: number;
+  rackSlot?: number;
 }
 
 export interface Link {

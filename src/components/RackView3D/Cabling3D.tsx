@@ -17,11 +17,11 @@ export const Cabling3D: React.FC<Cabling3DProps> = ({ devices, links }) => {
 
   // Helper to resolve device 3D position
   const getDevicePos = (id: string): [number, number, number] | null => {
-    const globalIdx = devices.findIndex((d) => d.id === id);
-    if (globalIdx === -1) return null;
+    const dev = devices.find(d => d.id === id);
+    if (!dev) return null;
 
-    const cabinetIdx = Math.floor(globalIdx / 10);
-    const slotIdx = globalIdx % 10;
+    const cabinetIdx = dev.rackCabinet !== undefined ? dev.rackCabinet : Math.floor(devices.indexOf(dev) / 10);
+    const slotIdx = dev.rackSlot !== undefined ? dev.rackSlot : devices.indexOf(dev) % 10;
 
     const posX = cabinetIdx * spacingBetweenRacks;
     const posY = startY + slotIdx * verticalSpacing;
@@ -47,11 +47,33 @@ export const Cabling3D: React.FC<Cabling3DProps> = ({ devices, links }) => {
           srcDev?.status === 'down' || 
           tgtDev?.status === 'down';
 
-        const color = isDown ? '#f87171' : '#a1a1aa'; // Light red vs Muted gray
-        const lineWidth = isDown ? 2 : 1.5;
+        // Styling wires specifically based on their connection type and status
+        let color = '#a1a1aa'; // default gray
+        let lineWidth = 1.5;
+
+        if (isDown) {
+          color = '#ef4444'; // Red for down/disconnected
+          lineWidth = 2.0;
+        } else if (srcDev && tgtDev) {
+          const isCore = srcDev.tier === 'core' && tgtDev.tier === 'core';
+          const isEdge = srcDev.tier === 'edge' || tgtDev.tier === 'edge';
+          
+          if (isCore) {
+            color = '#06b6d4'; // Cyan for Core networks
+            lineWidth = 3.0; // Thicker backbone cables
+          } else if (isEdge) {
+            color = '#8b5cf6'; // Violet for Edge/Gateway links
+            lineWidth = 2.2;
+          } else if (srcDev.type === 'server' || tgtDev.type === 'server') {
+            color = '#10b981'; // Green for Server access links
+            lineWidth = 1.5;
+          } else {
+            color = '#3b82f6'; // Blue for Distribution/Access switch links
+            lineWidth = 1.8;
+          }
+        }
 
         // Create a slight curve (catenary/sag effect) between ports
-        // Add a midpoint that sag downwards slightly
         const midPoint: [number, number, number] = [
           (startPos[0] + endPos[0]) / 2,
           Math.min(startPos[1], endPos[1]) - 0.4,

@@ -22,6 +22,8 @@ interface TopologyState {
   updateDevicePosition: (id: string, position: { x: number; y: number }) => void;
   setTopologyPositions: (positions: Record<string, { x: number; y: number }>) => void;
   moveDeviceInRack: (id: string, targetCabinet: number, targetSlot: number) => void;
+  cabinetCount: number;
+  addRack: () => void;
 }
 
 // Reachability/Cascade Connectivity Simulation Logic
@@ -235,30 +237,15 @@ export const useTopologyStore = create<TopologyState>((set) => {
     })),
 
     moveDeviceInRack: (id, targetCabinet, targetSlot) => set((state) => {
-      const targetDevice = state.devices.find(d => d.id === id);
-      if (!targetDevice) return {};
-
-      // Split into non-firewall and firewall devices
-      const nonFirewalls = state.devices.filter(d => d.type !== 'firewall');
-      const firewalls = state.devices.filter(d => d.type === 'firewall');
-
-      const currentIndex = nonFirewalls.findIndex(d => d.id === id);
-      if (currentIndex === -1) return {};
-
-      nonFirewalls.splice(currentIndex, 1);
-      
-      const targetIndex = Math.min(
-        Math.max(0, targetCabinet * 10 + targetSlot),
-        nonFirewalls.length
+      const updatedDevices = state.devices.map(d => 
+        d.id === id ? { ...d, rackCabinet: targetCabinet, rackSlot: targetSlot } : d
       );
-      nonFirewalls.splice(targetIndex, 0, targetDevice);
-
-      // Recombine, putting firewalls at the end so they don't mess up 3D stacking indices
-      const updatedDevices = [...nonFirewalls, ...firewalls];
-
       return {
         devices: computeSimulation(updatedDevices, state.links),
       };
     }),
+
+    cabinetCount: 3,
+    addRack: () => set((state) => ({ cabinetCount: state.cabinetCount + 1 })),
   };
 });
