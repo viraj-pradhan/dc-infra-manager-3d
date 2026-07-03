@@ -23,15 +23,13 @@ export const RackView3D: React.FC = () => {
     addRack
   } = useTopologyStore();
 
-  // Filter out Firewalls since they are software-only
   const devices3D = useMemo(() => {
-    return devices.filter(d => d.type !== 'firewall');
+    return devices;
   }, [devices]);
 
   const links3D = useMemo(() => {
-    const firewallIds = new Set(devices.filter(d => d.type === 'firewall').map(d => d.id));
-    return links.filter(l => !firewallIds.has(l.source) && !firewallIds.has(l.target));
-  }, [links, devices]);
+    return links;
+  }, [links]);
 
   // Group devices into cabinets of 10 units each sequentially
   const cabinets = useMemo(() => {
@@ -54,10 +52,9 @@ export const RackView3D: React.FC = () => {
     return cabList;
   }, [devices3D, cabinetCount]);
 
-  // Selected device for the overlay panel (ensure it's not a firewall)
+  // Selected device for the overlay panel
   const activeDevice = useMemo(() => {
-    const found = devices.find(d => d.id === activeDeviceId);
-    return found && found.type !== 'firewall' ? found : null;
+    return devices.find(d => d.id === activeDeviceId) || null;
   }, [devices, activeDeviceId]);
 
   // Calculate default camera target / focus point
@@ -233,8 +230,8 @@ export const RackView3D: React.FC = () => {
               </div>
             </div>
 
-            {/* Rack Placement Controls (Only for Switches and Routers) */}
-            {(activeDevice.type === 'switch' || activeDevice.type === 'router') && (
+            {/* Rack Placement Controls */}
+            {activeDevice && (
               <div className="pt-3 border-t border-slate-800 space-y-2">
                 <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Rack Placement</span>
                 <div className="grid grid-cols-2 gap-2">
