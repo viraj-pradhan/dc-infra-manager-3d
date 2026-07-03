@@ -21,6 +21,7 @@ interface TopologyState {
   importTopology: (devices: Device[], links: Link[]) => void;
   updateDevicePosition: (id: string, position: { x: number; y: number }) => void;
   setTopologyPositions: (positions: Record<string, { x: number; y: number }>) => void;
+  moveDeviceInRack: (id: string, targetCabinet: number, targetSlot: number) => void;
 }
 
 // Reachability/Cascade Connectivity Simulation Logic
@@ -232,5 +233,23 @@ export const useTopologyStore = create<TopologyState>((set) => {
     setTopologyPositions: (positions) => set((state) => ({
       devices: state.devices.map(d => positions[d.id] ? { ...d, position: positions[d.id] } : d),
     })),
+
+    moveDeviceInRack: (id, targetCabinet, targetSlot) => set((state) => {
+      const currentIndex = state.devices.findIndex(d => d.id === id);
+      if (currentIndex === -1) return {};
+
+      const updatedDevices = [...state.devices];
+      const [device] = updatedDevices.splice(currentIndex, 1);
+      
+      const targetIndex = Math.min(
+        Math.max(0, targetCabinet * 10 + targetSlot),
+        updatedDevices.length
+      );
+
+      updatedDevices.splice(targetIndex, 0, device);
+      return {
+        devices: computeSimulation(updatedDevices, state.links),
+      };
+    }),
   };
 });

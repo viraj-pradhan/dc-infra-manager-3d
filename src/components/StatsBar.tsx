@@ -2,11 +2,13 @@
 
 import React from 'react';
 import { useTopologyStore } from '../store/useTopologyStore';
+import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from '../context/ThemeContext';
-import { Database, Link2, ShieldCheck, AlertCircle, Heart, Sun, Moon, History } from 'lucide-react';
+import { Database, Link2, ShieldCheck, AlertCircle, Heart, Sun, Moon, LogOut, History } from 'lucide-react';
 
 export const StatsBar: React.FC = () => {
   const { devices, links, setShowHistory, activeTab, setActiveTab } = useTopologyStore();
+  const { data: session } = useSession();
   const { theme, toggleTheme } = useTheme();
 
   const totalDevices = devices.length;
@@ -130,6 +132,16 @@ export const StatsBar: React.FC = () => {
 
       {/* User Actions Panel */}
       <div className="flex items-center gap-3 ml-auto shrink-0 border-l border-slate-200/80 dark:border-slate-800 pl-6">
+        {/* User profile details */}
+        {session?.user && (
+          <div className="hidden lg:flex flex-col text-right">
+            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
+              {session.user.email}
+            </span>
+            <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Operator</span>
+          </div>
+        )}
+
         {/* History sidebar toggle */}
         <button
           onClick={() => setShowHistory(true)}
@@ -146,6 +158,15 @@ export const StatsBar: React.FC = () => {
           title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
         >
           {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </button>
+
+        {/* Sign Out */}
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 border border-transparent hover:border-red-200/50 dark:hover:border-red-900/30 rounded-xl transition cursor-pointer"
+          title="Sign Out"
+        >
+          <LogOut className="w-4 h-4" />
         </button>
       </div>
     </div>

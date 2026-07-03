@@ -14,7 +14,8 @@ export const RackView3D: React.FC = () => {
     links, 
     activeDeviceId, 
     setActiveDeviceId,
-    updateDevice
+    updateDevice,
+    moveDeviceInRack
   } = useTopologyStore();
 
   // Group devices into cabinets of 10 units each sequentially
@@ -193,6 +194,53 @@ export const RackView3D: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Rack Placement Controls (Only for Switches and Routers) */}
+            {(activeDevice.type === 'switch' || activeDevice.type === 'router') && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Rack Placement</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-1">Cabinet</label>
+                    <select
+                      value={Math.floor(devices.findIndex(d => d.id === activeDevice.id) / 10)}
+                      onChange={(e) => {
+                        const cabIdx = parseInt(e.target.value, 10);
+                        const devIdx = devices.findIndex(d => d.id === activeDevice.id);
+                        const slotIdx = devIdx % 10;
+                        moveDeviceInRack(activeDevice.id, cabIdx, slotIdx);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      {cabinets.map((_, idx) => (
+                        <option key={idx} value={idx}>
+                          Rack {idx + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-1">Slot Position</label>
+                    <select
+                      value={devices.findIndex(d => d.id === activeDevice.id) % 10}
+                      onChange={(e) => {
+                        const slotIdx = parseInt(e.target.value, 10);
+                        const devIdx = devices.findIndex(d => d.id === activeDevice.id);
+                        const cabIdx = Math.floor(devIdx / 10);
+                        moveDeviceInRack(activeDevice.id, cabIdx, slotIdx);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      {Array.from({ length: 10 }).map((_, idx) => (
+                        <option key={idx} value={idx}>
+                          Unit {idx + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Status Badge */}
             <div className="pt-3 border-t border-slate-800 flex items-center justify-between">

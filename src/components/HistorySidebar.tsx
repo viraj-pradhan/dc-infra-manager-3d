@@ -20,12 +20,15 @@ export const HistorySidebar: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchHistory = () => {
+  const fetchHistory = async () => {
     setLoading(true);
     setError(null);
     try {
-      const saved = localStorage.getItem('saved_topologies');
-      const data = saved ? JSON.parse(saved) : [];
+      const response = await fetch('/api/topologies');
+      if (!response.ok) {
+        throw new Error('Failed to fetch topology history.');
+      }
+      const data = await response.json();
       setTopologies(data);
     } catch (err: any) {
       setError(err.message || 'An error occurred.');
@@ -52,17 +55,19 @@ export const HistorySidebar: React.FC = () => {
     }, 100);
   };
 
-  const handleDeleteTopology = (e: React.MouseEvent, id: string) => {
+  const handleDeleteTopology = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const confirmDelete = window.confirm('Are you sure you want to delete this saved topology?');
     if (!confirmDelete) return;
 
     try {
-      const saved = localStorage.getItem('saved_topologies');
-      const topologies = saved ? JSON.parse(saved) : [];
-      const updated = topologies.filter((item: TopologyRecord) => item._id !== id);
-      localStorage.setItem('saved_topologies', JSON.stringify(updated));
-      setTopologies(updated);
+      const response = await fetch(`/api/topologies?id=${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete topology.');
+      }
+      setTopologies((prev) => prev.filter((item) => item._id !== id));
     } catch (err: any) {
       alert(err.message || 'Failed to delete topology.');
     }
