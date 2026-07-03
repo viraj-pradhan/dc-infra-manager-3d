@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 
 type Theme = 'light' | 'dark';
 
@@ -13,23 +12,21 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data: session, update: updateSession } = useSession();
   const [theme, setTheme] = useState<Theme>('light');
 
-  // Load theme from user session or localStorage
+  // Load theme from localStorage
   useEffect(() => {
-    if (session?.user && (session.user as any).theme) {
-      const userTheme = (session.user as any).theme as Theme;
-      setTheme(userTheme);
-      applyTheme(userTheme);
+    const localTheme = localStorage.getItem('theme') as Theme;
+    if (localTheme) {
+      setTheme(localTheme);
+      applyTheme(localTheme);
     } else {
-      const localTheme = localStorage.getItem('theme') as Theme;
-      if (localTheme) {
-        setTheme(localTheme);
-        applyTheme(localTheme);
-      }
+      // Check system preference
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      setTheme(systemTheme);
+      applyTheme(systemTheme);
     }
-  }, [session]);
+  }, []);
 
   const applyTheme = (t: Theme) => {
     const root = window.document.documentElement;
@@ -40,25 +37,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const toggleTheme = async () => {
+  const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     applyTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-
-    if (session?.user) {
-      try {
-        await fetch('/api/user/theme', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ theme: newTheme }),
-        });
-        // Update NextAuth session state
-        await updateSession({ theme: newTheme });
-      } catch (err) {
-        console.error('Failed to save theme preference', err);
-      }
-    }
   };
 
   return (

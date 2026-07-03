@@ -51,7 +51,7 @@ export const Toolbar: React.FC = () => {
     e.target.value = '';
   };
 
-  const handleCloudSave = async () => {
+  const handleCloudSave = () => {
     const name = window.prompt(
       'Enter a name for this topology snapshot:',
       `Topology Snapshot ${new Date().toLocaleDateString()}`
@@ -59,19 +59,22 @@ export const Toolbar: React.FC = () => {
     if (!name || name.trim() === '') return;
 
     try {
-      const response = await fetch('/api/topologies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), devices, links }),
-      });
-      if (response.ok) {
-        alert('Topology snapshot saved to cloud successfully!');
-      } else {
-        const errData = await response.json();
-        alert(`Failed to save: ${errData.message || 'Unknown error'}`);
-      }
+      const saved = localStorage.getItem('saved_topologies');
+      const topologies = saved ? JSON.parse(saved) : [];
+      
+      const newTopology = {
+        _id: 'topo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        name: name.trim(),
+        devices,
+        links,
+        createdAt: new Date().toISOString(),
+      };
+
+      topologies.unshift(newTopology);
+      localStorage.setItem('saved_topologies', JSON.stringify(topologies));
+      alert('Topology snapshot saved successfully to local storage!');
     } catch (err) {
-      alert('Error connecting to save service.');
+      alert('Error saving topology to local storage.');
     }
   };
 
