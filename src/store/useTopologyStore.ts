@@ -235,18 +235,27 @@ export const useTopologyStore = create<TopologyState>((set) => {
     })),
 
     moveDeviceInRack: (id, targetCabinet, targetSlot) => set((state) => {
-      const currentIndex = state.devices.findIndex(d => d.id === id);
+      const targetDevice = state.devices.find(d => d.id === id);
+      if (!targetDevice) return {};
+
+      // Split into non-firewall and firewall devices
+      const nonFirewalls = state.devices.filter(d => d.type !== 'firewall');
+      const firewalls = state.devices.filter(d => d.type === 'firewall');
+
+      const currentIndex = nonFirewalls.findIndex(d => d.id === id);
       if (currentIndex === -1) return {};
 
-      const updatedDevices = [...state.devices];
-      const [device] = updatedDevices.splice(currentIndex, 1);
+      nonFirewalls.splice(currentIndex, 1);
       
       const targetIndex = Math.min(
         Math.max(0, targetCabinet * 10 + targetSlot),
-        updatedDevices.length
+        nonFirewalls.length
       );
+      nonFirewalls.splice(targetIndex, 0, targetDevice);
 
-      updatedDevices.splice(targetIndex, 0, device);
+      // Recombine, putting firewalls at the end so they don't mess up 3D stacking indices
+      const updatedDevices = [...nonFirewalls, ...firewalls];
+
       return {
         devices: computeSimulation(updatedDevices, state.links),
       };

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid } from '@react-three/drei';
 import { useTopologyStore } from '../../store/useTopologyStore';
@@ -9,27 +9,41 @@ import { Cabling3D } from './Cabling3D';
 import { Info, ShieldAlert, Cpu, Power, Server, ShieldCheck, Router, Network, Waypoints, X } from 'lucide-react';
 
 export const RackView3D: React.FC = () => {
+  const [connectTargetId, setConnectTargetId] = useState<string>('');
   const { 
     devices, 
     links, 
     activeDeviceId, 
     setActiveDeviceId,
     updateDevice,
-    moveDeviceInRack
+    moveDeviceInRack,
+    addLink,
+    deleteLink
   } = useTopologyStore();
+
+  // Filter out Firewalls since they are software-only
+  const devices3D = useMemo(() => {
+    return devices.filter(d => d.type !== 'firewall');
+  }, [devices]);
+
+  const links3D = useMemo(() => {
+    const firewallIds = new Set(devices.filter(d => d.type === 'firewall').map(d => d.id));
+    return links.filter(l => !firewallIds.has(l.source) && !firewallIds.has(l.target));
+  }, [links, devices]);
 
   // Group devices into cabinets of 10 units each sequentially
   const cabinets = useMemo(() => {
-    const cabList: typeof devices[] = [];
-    for (let i = 0; i < devices.length; i += 10) {
-      cabList.push(devices.slice(i, i + 10));
+    const cabList: typeof devices3D[] = [];
+    for (let i = 0; i < devices3D.length; i += 10) {
+      cabList.push(devices3D.slice(i, i + 10));
     }
     return cabList;
-  }, [devices]);
+  }, [devices3D]);
 
-  // Selected device for the overlay panel
+  // Selected device for the overlay panel (ensure it's not a firewall)
   const activeDevice = useMemo(() => {
-    return devices.find(d => d.id === activeDeviceId) || null;
+    const found = devices.find(d => d.id === activeDeviceId);
+    return found && found.type !== 'firewall' ? found : null;
   }, [devices, activeDeviceId]);
 
   // Calculate default camera target / focus point
@@ -95,7 +109,7 @@ export const RackView3D: React.FC = () => {
           ))}
 
           {/* Inter-rack patching cords */}
-          <Cabling3D devices={devices} links={links} />
+          <Cabling3D devices={devices3D} links={links3D} />
         </group>
 
         {/* Orbit Camera controls */}
@@ -203,10 +217,10 @@ export const RackView3D: React.FC = () => {
                   <div>
                     <label className="text-[9px] text-slate-500 block mb-1">Cabinet</label>
                     <select
-                      value={Math.floor(devices.findIndex(d => d.id === activeDevice.id) / 10)}
+                      value={Math.floor(devices3D.findIndex(d => d.id === activeDevice.id) / 10)}
                       onChange={(e) => {
                         const cabIdx = parseInt(e.target.value, 10);
-                        const devIdx = devices.findIndex(d => d.id === activeDevice.id);
+                        const devIdx = devices3D.findIndex(d => d.id === activeDevice.id);
                         const slotIdx = devIdx % 10;
                         moveDeviceInRack(activeDevice.id, cabIdx, slotIdx);
                       }}
@@ -222,10 +236,10 @@ export const RackView3D: React.FC = () => {
                   <div>
                     <label className="text-[9px] text-slate-500 block mb-1">Slot Position</label>
                     <select
-                      value={devices.findIndex(d => d.id === activeDevice.id) % 10}
+                      value={devices3D.findIndex(d => d.id === activeDevice.id) % 10}
                       onChange={(e) => {
                         const slotIdx = parseInt(e.target.value, 10);
-                        const devIdx = devices.findIndex(d => d.id === activeDevice.id);
+                        const devIdx = devices3D.findIndex(d => d.id === activeDevice.id);
                         const cabIdx = Math.floor(devIdx / 10);
                         moveDeviceInRack(activeDevice.id, cabIdx, slotIdx);
                       }}
@@ -241,6 +255,69 @@ export const RackView3D: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Topology Editing (Manage Links) in 3D */}
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Topology Connections</span>
+              
+              {/* Existing Links List */}
+              <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
+                {links3D.filter(l => l.source === activeDevice.id || l.target === activeDevice.id).map(l => {
+                  const peerId = l.source === activeDevice.id ? l.target : l.source;
+                  const peerDevice = devices3D.find(d => d.id === peerId);
+                  if (!peerDevice) return null;
+                  return (
+                    <div key={l.id} className="flex items-center justify-between bg-slate-850 border border-slate-800 px-2 py-1 rounded">
+                      <span className="text-[10px] text-slate-300 truncate max-w-[120px]">{peerDevice.name}</span>
+                      <button
+                        onClick={() => deleteLink(l.id)}
+                        className="text-[9px] font-bold text-red-400 hover:text-red-300 transition cursor-pointer"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  );
+                })}
+                {links3D.filter(l => l.source === activeDevice.id || l.target === activeDevice.id).length === 0 && (
+                  <span className="text-[9px] text-slate-500 italic block">No active connections.</span>
+                )}
+              </div>
+
+              {/* Add Link Control */}
+              <div className="pt-1.5 flex gap-1.5">
+                <select
+                  value={connectTargetId}
+                  onChange={(e) => setConnectTargetId(e.target.value)}
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Select target...</option>
+                  {devices3D
+                    .filter(d => {
+                      if (d.id === activeDevice.id) return false;
+                      const alreadyConnected = links3D.some(l => 
+                        (l.source === activeDevice.id && l.target === d.id) ||
+                        (l.source === d.id && l.target === activeDevice.id)
+                      );
+                      return !alreadyConnected;
+                    })
+                    .map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.type})
+                      </option>
+                    ))}
+                </select>
+                <button
+                  onClick={() => {
+                    if (!connectTargetId) return;
+                    addLink({ source: activeDevice.id, target: connectTargetId });
+                    setConnectTargetId('');
+                  }}
+                  className="px-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                >
+                  Connect
+                </button>
+              </div>
+            </div>
 
             {/* Status Badge */}
             <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
