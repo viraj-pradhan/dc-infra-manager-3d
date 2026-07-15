@@ -122,27 +122,57 @@ export const RackView3D: React.FC = () => {
         camera={{ position: [cameraTarget[0], 6, 9], fov: 50 }}
         shadows
       >
-        {/* Environment Lights */}
-        <ambientLight intensity={0.5} />
+        {/* Environment Lights - Dim/Moody Industrial Server Room */}
+        <ambientLight intensity={0.15} />
+        <pointLight position={[cameraTarget[0], 6.5, 3]} intensity={1.5} distance={15} color="#3b82f6" />
+        <pointLight position={[cameraTarget[0], 6.5, -3]} intensity={1.2} distance={15} color="#10b981" />
         <directionalLight 
-          position={[5, 12, 8]} 
-          intensity={0.8} 
-          castShadow 
-          shadow-mapSize={[1024, 1024]}
+          position={[0, 15, 0]} 
+          intensity={0.25} 
         />
-        <pointLight position={[-10, 10, -10]} intensity={0.3} />
+
+        {/* Server Room Floor Plane */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+          <planeGeometry args={[100, 100]} />
+          <meshStandardMaterial color="#07070a" roughness={0.8} metalness={0.9} />
+        </mesh>
+
+        {/* Server Room Back Concrete Wall */}
+        <mesh position={[cameraTarget[0], 4, -8]}>
+          <boxGeometry args={[120, 8.5, 0.4]} />
+          <meshStandardMaterial color="#0e0e12" roughness={0.9} metalness={0.1} />
+        </mesh>
+
+        {/* Overhead Horizontal Metal Cable Tray/Spine running horizontal across all racks at y=7.5, z=-1.3 */}
+        <group>
+          {/* Main spine tray support beam */}
+          <mesh position={[cameraTarget[0], 7.5, -1.3]}>
+            <boxGeometry args={[100, 0.08, 0.5]} />
+            <meshStandardMaterial color="#1a1a24" metalness={0.8} roughness={0.5} />
+          </mesh>
+          {/* Hanging support rods */}
+          {Array.from({ length: Math.max(3, cabinets.length) }).map((_, idx) => {
+            const posX = idx * 4.5;
+            return (
+              <mesh key={idx} position={[posX, 8.5, -1.3]}>
+                <cylinderGeometry args={[0.02, 0.02, 2.0, 8]} />
+                <meshStandardMaterial color="#2d2d3a" metalness={0.9} roughness={0.3} />
+              </mesh>
+            );
+          })}
+        </group>
 
         {/* Floor Grid for perspective */}
         <Grid
           position={[0, -0.01, 0]}
-          args={[40, 40]}
-          cellSize={1.0}
-          cellThickness={1.0}
-          cellColor="#27272a"
-          sectionSize={5.0}
-          sectionThickness={1.5}
-          sectionColor="#3f3f46"
-          fadeDistance={30}
+          args={[60, 60]}
+          cellSize={1.5}
+          cellThickness={0.8}
+          cellColor="#1e293b"
+          sectionSize={6.0}
+          sectionThickness={1.2}
+          sectionColor="#334155"
+          fadeDistance={25}
         />
 
         {/* Racks Group */}

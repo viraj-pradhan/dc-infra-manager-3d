@@ -52,19 +52,30 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
 
   return (
     <group position={[posX, 0, 0]}>
-      {/* ── Cabinet Frame ── */}
-      {/* Outer rack frame / cabinet box */}
-      <mesh position={[0, cabinetHeight / 2 - 0.2, 0]}>
-        <boxGeometry args={[cabinetWidth, cabinetHeight, cabinetDepth]} />
-        <meshBasicMaterial 
-          color="#374151" 
-          wireframe 
-          transparent 
-          opacity={0.15} 
-        />
+      {/* ── Cabinet Frame Enclosure (Waseku-Style Tall Dark Metal Frames) ── */}
+      {/* Back Panel Grid */}
+      <mesh position={[0, cabinetHeight / 2 - 0.2, -cabinetDepth / 2]}>
+        <planeGeometry args={[cabinetWidth, cabinetHeight]} />
+        <meshStandardMaterial color="#0f0f13" metalness={0.9} roughness={0.7} />
       </mesh>
 
-      {/* Rack structural columns (corners) */}
+      {/* Side Plates */}
+      <mesh position={[-cabinetWidth / 2, cabinetHeight / 2 - 0.2, 0]}>
+        <boxGeometry args={[0.04, cabinetHeight, cabinetDepth]} />
+        <meshStandardMaterial color="#1a1a24" metalness={0.8} roughness={0.6} />
+      </mesh>
+      <mesh position={[cabinetWidth / 2, cabinetHeight / 2 - 0.2, 0]}>
+        <boxGeometry args={[0.04, cabinetHeight, cabinetDepth]} />
+        <meshStandardMaterial color="#1a1a24" metalness={0.8} roughness={0.6} />
+      </mesh>
+
+      {/* Top Cap */}
+      <mesh position={[0, cabinetHeight - 0.2, 0]}>
+        <boxGeometry args={[cabinetWidth, 0.08, cabinetDepth]} />
+        <meshStandardMaterial color="#111115" metalness={0.9} roughness={0.5} />
+      </mesh>
+
+      {/* Cabinet Frame Columns */}
       {[
         [-cabinetWidth/2, -cabinetDepth/2],
         [cabinetWidth/2, -cabinetDepth/2],
@@ -72,22 +83,20 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
         [cabinetWidth/2, cabinetDepth/2]
       ].map(([x, z], i) => (
         <mesh key={i} position={[x, cabinetHeight / 2 - 0.2, z]}>
-          <cylinderGeometry args={[0.08, 0.08, cabinetHeight, 8]} />
-          <meshStandardMaterial color="#1f2937" roughness={0.7} metalness={0.2} />
+          <cylinderGeometry args={[0.06, 0.06, cabinetHeight, 8]} />
+          <meshStandardMaterial color="#111116" roughness={0.5} metalness={0.8} />
         </mesh>
       ))}
 
       {/* Cabinet Label */}
       <Html position={[0, cabinetHeight + 0.3, 0]} center>
-        <div className="bg-slate-900/90 backdrop-blur-sm text-slate-200 text-[10px] font-bold px-3 py-1 rounded-full border border-slate-700 shadow-md whitespace-nowrap uppercase tracking-wider">
+        <div className="bg-slate-950/90 backdrop-blur-md text-slate-100 text-[10px] font-bold px-4 py-1.5 rounded-xl border border-slate-800 shadow-2xl whitespace-nowrap uppercase tracking-wider">
           {label}
         </div>
       </Html>
 
       {/* ── Render Devices (stacked vertically) ── */}
       {devices.map((device, idx) => {
-        // Compute vertical position (slot offset)
-        // 10 units maximum per cabinet. Height of each unit is 0.5 units, with 0.15 spacing.
         const slotHeight = 0.5;
         const verticalSpacing = 0.62;
         const startY = 0.5;
@@ -107,47 +116,52 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
               setActiveDeviceId(isSelected ? null : device.id);
             }}
           >
-            {/* 3D Box representing the device: Solid hardware chassis */}
+            {/* 3D Hardware Chassis */}
             <mesh>
               <boxGeometry args={[2.0, slotHeight, 2.0]} />
               <meshStandardMaterial 
                 color={deviceColor} 
-                roughness={0.4} 
-                metalness={0.5} 
+                roughness={0.5} 
+                metalness={0.8} 
                 emissive={isSelected ? '#3b82f6' : '#000000'}
-                emissiveIntensity={isSelected ? 0.3 : 0}
+                emissiveIntensity={isSelected ? 0.4 : 0}
               />
             </mesh>
 
-            {/* Front Panel details (metal accent faceplate) */}
+            {/* Faceplate / Front Panel strip */}
             <mesh position={[0, 0, 1.01]}>
-              <planeGeometry args={[1.9, slotHeight - 0.05]} />
-              <meshStandardMaterial color="#111827" roughness={0.9} />
+              <planeGeometry args={[1.9, slotHeight - 0.08]} />
+              <meshStandardMaterial color="#09090d" roughness={0.9} />
             </mesh>
 
-            {/* Small stylized grid vents on front faceplate */}
-            <mesh position={[0.1, 0, 1.02]}>
-              <planeGeometry args={[1.2, 0.15]} />
-              <meshBasicMaterial color="#374151" />
+            {/* Blinking Indicator LED Strips on the front (Tactile feel) */}
+            {Array.from({ length: 5 }).map((_, ledIdx) => (
+              <mesh key={ledIdx} position={[-0.4 + ledIdx * 0.15, 0, 1.025]}>
+                <sphereGeometry args={[0.025, 8, 8]} />
+                <meshBasicMaterial 
+                  color={device.status === 'down' ? '#dc2626' : device.status === 'degraded' ? '#d97706' : '#059669'} 
+                  toneMapped={false}
+                />
+              </mesh>
+            ))}
+
+            {/* Main Power/Status LED indicator on the left side of front panel */}
+            <mesh position={[-0.8, 0, 1.025]}>
+              <sphereGeometry args={[0.05, 16, 16]} />
+              <meshBasicMaterial color={statusColor} toneMapped={false} />
             </mesh>
 
             {/* Selection highlight frame */}
             {isSelected && (
               <mesh>
-                <boxGeometry args={[2.1, slotHeight + 0.1, 2.1]} />
-                <meshBasicMaterial color="#3b82f6" wireframe transparent opacity={0.6} />
+                <boxGeometry args={[2.05, slotHeight + 0.05, 2.05]} />
+                <meshBasicMaterial color="#3b82f6" wireframe transparent opacity={0.8} />
               </mesh>
             )}
 
-            {/* Status LED Sphere */}
-            <mesh position={[-0.8, 0, 1.03]}>
-              <sphereGeometry args={[0.07, 16, 16]} />
-              <meshBasicMaterial color={statusColor} />
-            </mesh>
-
             {/* HTML label showing device name on hover or click */}
             <Html 
-              position={[0, 0, 1.2]} 
+              position={[0, 0, 1.15]} 
               center 
               distanceFactor={8}
             >
@@ -155,7 +169,7 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
                 className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider select-none pointer-events-none transition-all ${
                   isSelected 
                     ? 'bg-blue-600 text-white shadow-md' 
-                    : 'bg-black/60 text-slate-300'
+                    : 'bg-black/80 text-slate-400 border border-slate-900'
                 }`}
               >
                 {device.name}
