@@ -53,26 +53,37 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
   return (
     <group position={[posX, 0, 0]}>
       {/* ── Cabinet Frame Enclosure (Waseku-Style Tall Dark Metal Frames) ── */}
+      {/* Outer boundary wireframe helper to make cabinets readable */}
+      <mesh position={[0, cabinetHeight / 2 - 0.2, 0]}>
+        <boxGeometry args={[cabinetWidth + 0.02, cabinetHeight + 0.02, cabinetDepth + 0.02]} />
+        <meshBasicMaterial 
+          color="#64748b" 
+          wireframe 
+          transparent 
+          opacity={0.25} 
+        />
+      </mesh>
+
       {/* Back Panel Grid */}
       <mesh position={[0, cabinetHeight / 2 - 0.2, -cabinetDepth / 2]}>
         <planeGeometry args={[cabinetWidth, cabinetHeight]} />
-        <meshStandardMaterial color="#0f0f13" metalness={0.9} roughness={0.7} />
+        <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.6} />
       </mesh>
 
       {/* Side Plates */}
       <mesh position={[-cabinetWidth / 2, cabinetHeight / 2 - 0.2, 0]}>
         <boxGeometry args={[0.04, cabinetHeight, cabinetDepth]} />
-        <meshStandardMaterial color="#1a1a24" metalness={0.8} roughness={0.6} />
+        <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.5} />
       </mesh>
       <mesh position={[cabinetWidth / 2, cabinetHeight / 2 - 0.2, 0]}>
         <boxGeometry args={[0.04, cabinetHeight, cabinetDepth]} />
-        <meshStandardMaterial color="#1a1a24" metalness={0.8} roughness={0.6} />
+        <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.5} />
       </mesh>
 
       {/* Top Cap */}
       <mesh position={[0, cabinetHeight - 0.2, 0]}>
         <boxGeometry args={[cabinetWidth, 0.08, cabinetDepth]} />
-        <meshStandardMaterial color="#111115" metalness={0.9} roughness={0.5} />
+        <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.4} />
       </mesh>
 
       {/* Cabinet Frame Columns */}
@@ -84,7 +95,7 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
       ].map(([x, z], i) => (
         <mesh key={i} position={[x, cabinetHeight / 2 - 0.2, z]}>
           <cylinderGeometry args={[0.06, 0.06, cabinetHeight, 8]} />
-          <meshStandardMaterial color="#111116" roughness={0.5} metalness={0.8} />
+          <meshStandardMaterial color="#4b5563" roughness={0.4} metalness={0.7} />
         </mesh>
       ))}
 

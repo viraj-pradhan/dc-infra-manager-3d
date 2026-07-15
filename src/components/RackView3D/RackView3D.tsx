@@ -122,13 +122,13 @@ export const RackView3D: React.FC = () => {
         camera={{ position: [cameraTarget[0], 6, 9], fov: 50 }}
         shadows
       >
-        {/* Environment Lights - Dim/Moody Industrial Server Room */}
-        <ambientLight intensity={0.15} />
-        <pointLight position={[cameraTarget[0], 6.5, 3]} intensity={1.5} distance={15} color="#3b82f6" />
-        <pointLight position={[cameraTarget[0], 6.5, -3]} intensity={1.2} distance={15} color="#10b981" />
+        {/* Environment Lights - Moody but Highly Visible Server Room */}
+        <ambientLight intensity={0.45} />
+        <pointLight position={[cameraTarget[0], 6.5, 5]} intensity={2.0} distance={20} color="#60a5fa" />
+        <pointLight position={[cameraTarget[0], 6.5, -5]} intensity={1.5} distance={20} color="#34d399" />
         <directionalLight 
-          position={[0, 15, 0]} 
-          intensity={0.25} 
+          position={[5, 15, 5]} 
+          intensity={0.8} 
         />
 
         {/* Server Room Floor Plane */}
