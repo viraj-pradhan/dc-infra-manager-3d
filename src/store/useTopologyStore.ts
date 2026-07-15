@@ -24,7 +24,9 @@ interface TopologyState {
   moveDeviceInRack: (id: string, targetCabinet: number, targetSlot: number) => void;
   cabinetCount: number;
   addRack: () => void;
-  deleteRack: () => void;
+  deleteRack: (index?: number) => void;
+  rackLabels: Record<number, string>;
+  updateRackLabel: (index: number, label: string) => void;
 }
 
 // Reachability/Cascade Connectivity Simulation Logic
@@ -248,6 +250,41 @@ export const useTopologyStore = create<TopologyState>((set) => {
 
     cabinetCount: 3,
     addRack: () => set((state) => ({ cabinetCount: state.cabinetCount + 1 })),
-    deleteRack: () => set((state) => ({ cabinetCount: Math.max(1, state.cabinetCount - 1) })),
+    deleteRack: (index) => set((state) => {
+      const targetIdx = index !== undefined ? index : state.cabinetCount - 1;
+      if (state.cabinetCount <= 1) return {};
+
+      // Reset devices in deleted cabinet, shift indices for cabinets after
+      const updatedDevices = state.devices.map((d) => {
+        if (d.rackCabinet === targetIdx) {
+          return { ...d, rackCabinet: undefined, rackSlot: undefined };
+        }
+        if (d.rackCabinet !== undefined && d.rackCabinet > targetIdx) {
+          return { ...d, rackCabinet: d.rackCabinet - 1 };
+        }
+        return d;
+      });
+
+      // Shift rackLabels keys
+      const newLabels: Record<number, string> = {};
+      Object.entries(state.rackLabels).forEach(([keyStr, val]) => {
+        const key = parseInt(keyStr, 10);
+        if (key < targetIdx) {
+          newLabels[key] = val;
+        } else if (key > targetIdx) {
+          newLabels[key - 1] = val;
+        }
+      });
+
+      return {
+        cabinetCount: state.cabinetCount - 1,
+        devices: computeSimulation(updatedDevices, state.links),
+        rackLabels: newLabels,
+      };
+    }),
+    rackLabels: {},
+    updateRackLabel: (index, label) => set((state) => ({
+      rackLabels: { ...state.rackLabels, [index]: label }
+    })),
   };
 });

@@ -10,6 +10,7 @@ import { Info, ShieldAlert, Cpu, Power, Server, ShieldCheck, Router, Network, Wa
 
 export const RackView3D: React.FC = () => {
   const [connectTargetId, setConnectTargetId] = useState<string>('');
+  const [selectedCabinetIndex, setSelectedCabinetIndex] = useState<number | null>(null);
   const { 
     devices, 
     links, 
@@ -21,7 +22,9 @@ export const RackView3D: React.FC = () => {
     deleteLink,
     cabinetCount,
     addRack,
-    deleteRack
+    deleteRack,
+    rackLabels,
+    updateRackLabel
   } = useTopologyStore();
 
   const devices3D = useMemo(() => {
@@ -34,53 +37,79 @@ export const RackView3D: React.FC = () => {
 
 
 
-  // Group devices into cabinets dynamically based on role or manual overrides
+  // Group devices into cabinets dynamically based on role (8 devices max per cabinet)
   const cabinets = useMemo(() => {
     const list: typeof devices[] = Array.from({ length: cabinetCount }, () => []);
+    const cabinetLengths = Array.from({ length: cabinetCount }, () => 0);
 
-    devices.forEach((d) => {
-      let cabIdx = d.rackCabinet;
-      if (cabIdx === undefined) {
-        switch (d.type) {
-          case 'router':        cabIdx = 0; break;
-          case 'firewall':      cabIdx = 1; break;
-          case 'load-balancer': cabIdx = 2; break;
-          case 'switch':        cabIdx = 3; break;
-          case 'server':        cabIdx = 4; break;
-          default:              cabIdx = 4;
+    // Track which cabinet index we are currently allocating for default roles
+    let currentDefaultCabIdx = 0;
+
+    const groupRole = (roleType: string) => {
+      const roleDevices = devices.filter(d => d.type === roleType && d.rackCabinet === undefined);
+      
+      roleDevices.forEach((d) => {
+        // If current cabinet has 8 devices, move to the next default cabinet
+        if (cabinetLengths[currentDefaultCabIdx] >= 8) {
+          currentDefaultCabIdx++;
         }
+        
+        const finalCabIdx = Math.min(currentDefaultCabIdx, cabinetCount - 1);
+        list[finalCabIdx].push({
+          ...d,
+          rackSlot: cabinetLengths[finalCabIdx],
+        });
+        cabinetLengths[finalCabIdx]++;
+      });
+      
+      // Move to next cabinet slot for the next role, so they start in fresh cabinets
+      if (roleDevices.length > 0) {
+        currentDefaultCabIdx++;
       }
+    };
 
-      const finalCabIdx = Math.min(cabIdx, cabinetCount - 1);
-      const slotIdx = d.rackSlot !== undefined ? d.rackSlot : list[finalCabIdx].length;
-
-      if (finalCabIdx >= 0 && finalCabIdx < cabinetCount) {
+    // First place all devices that have manual overrides
+    devices.forEach((d) => {
+      if (d.rackCabinet !== undefined) {
+        const finalCabIdx = Math.min(d.rackCabinet, cabinetCount - 1);
+        const slotIdx = d.rackSlot !== undefined ? d.rackSlot : cabinetLengths[finalCabIdx];
         list[finalCabIdx].push({ ...d, rackSlot: slotIdx });
+        cabinetLengths[finalCabIdx]++;
       }
     });
 
+    // Then group unassigned devices by role
+    groupRole('router');
+    groupRole('firewall');
+    groupRole('load-balancer');
+    groupRole('switch');
+    groupRole('server');
+
+    // Sort each cabinet's devices by slotIndex so they render in correct order
     list.forEach(cab => {
       cab.sort((a, b) => (a.rackSlot ?? 0) - (b.rackSlot ?? 0));
     });
 
-    // Helper to assign a clean dominant label to each cabinet
+    // Helper to assign a clean dominant label to each cabinet (respecting custom override if set)
     return list.map((cabDevices, idx) => {
-      let label = `RACK CABINET ${idx + 1}`;
-      if (cabDevices.length > 0) {
-        const types = cabDevices.map(d => d.type);
-        const mostCommonType = types.reduce((a, b, i, arr) => 
-          arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b
-        );
-        switch (mostCommonType) {
-          case 'router':        label = 'CORE ROUTERS'; break;
-          case 'firewall':      label = 'FIREWALLS'; break;
-          case 'load-balancer': label = 'LOAD BALANCERS'; break;
-          case 'switch':        label = 'SWITCHES'; break;
-          case 'server':        label = `SERVERS ${idx + 1}`; break;
-          default:              label = `RACK CABINET ${idx + 1}`;
+      let label = rackLabels[idx];
+      if (!label) {
+        if (cabDevices.length > 0) {
+          const types = cabDevices.map(d => d.type);
+          const mostCommonType = types.reduce((a, b, i, arr) => 
+            arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b
+          );
+          switch (mostCommonType) {
+            case 'router':        label = 'CORE ROUTERS'; break;
+            case 'firewall':      label = 'FIREWALLS'; break;
+            case 'load-balancer': label = 'LOAD BALANCERS'; break;
+            case 'switch':        label = 'SWITCHES'; break;
+            case 'server':        label = `SERVERS ${idx + 1}`; break;
+            default:              label = `RACK CABINET ${idx + 1}`;
+          }
+        } else {
+          label = `RACK CABINET ${idx + 1} (EMPTY)`;
         }
-      } else {
-        label = `RACK CABINET ${idx + 1} (EMPTY)`;
       }
 
       return {
@@ -88,7 +117,7 @@ export const RackView3D: React.FC = () => {
         label,
       };
     });
-  }, [devices, cabinetCount]);
+  }, [devices, cabinetCount, rackLabels]);
 
   // Selected device for the overlay panel
   const activeDevice = useMemo(() => {
@@ -122,45 +151,13 @@ export const RackView3D: React.FC = () => {
         camera={{ position: [cameraTarget[0], 6, 9], fov: 50 }}
         shadows
       >
-        {/* Environment Lights - Moody but Highly Visible Server Room */}
-        <ambientLight intensity={0.45} />
-        <pointLight position={[cameraTarget[0], 6.5, 5]} intensity={2.0} distance={20} color="#60a5fa" />
-        <pointLight position={[cameraTarget[0], 6.5, -5]} intensity={1.5} distance={20} color="#34d399" />
+        {/* Environment Lights - Bright and Clear */}
+        <ambientLight intensity={0.6} />
         <directionalLight 
-          position={[5, 15, 5]} 
-          intensity={0.8} 
+          position={[10, 20, 10]} 
+          intensity={1.0} 
         />
-
-        {/* Server Room Floor Plane */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-          <planeGeometry args={[100, 100]} />
-          <meshStandardMaterial color="#07070a" roughness={0.8} metalness={0.9} />
-        </mesh>
-
-        {/* Server Room Back Concrete Wall */}
-        <mesh position={[cameraTarget[0], 4, -8]}>
-          <boxGeometry args={[120, 8.5, 0.4]} />
-          <meshStandardMaterial color="#0e0e12" roughness={0.9} metalness={0.1} />
-        </mesh>
-
-        {/* Overhead Horizontal Metal Cable Tray/Spine running horizontal across all racks at y=7.5, z=-1.3 */}
-        <group>
-          {/* Main spine tray support beam */}
-          <mesh position={[cameraTarget[0], 7.5, -1.3]}>
-            <boxGeometry args={[100, 0.08, 0.5]} />
-            <meshStandardMaterial color="#1a1a24" metalness={0.8} roughness={0.5} />
-          </mesh>
-          {/* Hanging support rods */}
-          {Array.from({ length: Math.max(3, cabinets.length) }).map((_, idx) => {
-            const posX = idx * 4.5;
-            return (
-              <mesh key={idx} position={[posX, 8.5, -1.3]}>
-                <cylinderGeometry args={[0.02, 0.02, 2.0, 8]} />
-                <meshStandardMaterial color="#2d2d3a" metalness={0.9} roughness={0.3} />
-              </mesh>
-            );
-          })}
-        </group>
+        <pointLight position={[-10, 10, -10]} intensity={0.3} />
 
         {/* Floor Grid for perspective */}
         <Grid
@@ -185,6 +182,8 @@ export const RackView3D: React.FC = () => {
               activeDeviceId={activeDeviceId}
               setActiveDeviceId={setActiveDeviceId}
               label={cab.label}
+              isSelectedCabinet={idx === selectedCabinetIndex}
+              onSelectCabinet={() => setSelectedCabinetIndex(idx === selectedCabinetIndex ? null : idx)}
             />
           ))}
 
@@ -210,22 +209,41 @@ export const RackView3D: React.FC = () => {
           <span>Drag to rotate • Scroll to zoom • Click unit to view details</span>
         </div>
         
-        <div className="flex gap-2 pointer-events-auto">
-          <button
-            onClick={addRack}
-            className="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-xl border border-blue-500/20 shadow-lg transition duration-150 flex items-center gap-1.5 cursor-pointer"
-          >
-            <Server className="w-3.5 h-3.5" />
-            <span>Add Cabinet</span>
-          </button>
-          <button
-            onClick={deleteRack}
-            disabled={cabinetCount <= 1}
-            className="bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-xl border border-red-500/20 shadow-lg transition duration-150 flex items-center gap-1.5 cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span>Delete Cabinet</span>
-          </button>
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          <div className="flex gap-2">
+            <button
+              onClick={addRack}
+              className="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-xl border border-blue-500/20 shadow-lg transition duration-150 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>Add Cabinet</span>
+            </button>
+          </div>
+
+          {selectedCabinetIndex !== null && (
+            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-3 rounded-xl shadow-lg flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 max-w-xs">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Cabinet {selectedCabinetIndex + 1} Selected</span>
+              <div className="flex gap-1.5 items-center">
+                <input
+                  type="text"
+                  value={cabinets[selectedCabinetIndex]?.label.includes('(EMPTY)') ? '' : cabinets[selectedCabinetIndex]?.label || ''}
+                  onChange={(e) => updateRackLabel(selectedCabinetIndex, e.target.value)}
+                  placeholder="Custom Cabinet Name"
+                  className="bg-slate-800 border border-slate-700 text-slate-200 text-[10px] px-2.5 py-1.5 rounded focus:outline-none focus:border-blue-500 w-36"
+                />
+                <button
+                  onClick={() => {
+                    deleteRack(selectedCabinetIndex);
+                    setSelectedCabinetIndex(null);
+                  }}
+                  className="bg-red-600 hover:bg-red-500 active:scale-95 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-500/20 shadow transition cursor-pointer flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -361,9 +379,9 @@ export const RackView3D: React.FC = () => {
                       }}
                       className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
                     >
-                      {Array.from({ length: 10 }).map((_, idx) => (
+                      {Array.from({ length: 8 }).map((_, idx) => (
                         <option key={idx} value={idx}>
-                          Unit {idx + 1}
+                          {idx + 1}U
                         </option>
                       ))}
                     </select>

@@ -10,6 +10,8 @@ interface RackCabinetProps {
   activeDeviceId: string | null;
   setActiveDeviceId: (id: string | null) => void;
   label: string;
+  isSelectedCabinet?: boolean;
+  onSelectCabinet?: () => void;
 }
 
 export const RackCabinet: React.FC<RackCabinetProps> = ({
@@ -18,10 +20,12 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
   activeDeviceId,
   setActiveDeviceId,
   label,
+  isSelectedCabinet = false,
+  onSelectCabinet,
 }) => {
   // Spacing in 3D scene
   const cabinetWidth = 2.4;
-  const cabinetHeight = 7.0;
+  const cabinetHeight = 5.8;
   const cabinetDepth = 2.4;
   const spacingBetweenRacks = 4.5;
 
@@ -52,50 +56,55 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
 
   return (
     <group position={[posX, 0, 0]}>
-      {/* ── Cabinet Frame Enclosure (Waseku-Style Tall Dark Metal Frames) ── */}
-      {/* Outer boundary wireframe helper to make cabinets readable */}
+      {/* ── Simple Wireframe Cabinet Frame (See-through for maximum legibility) ── */}
+      {/* Visual wireframe helper (no onClick event, so clicks pass through to devices inside!) */}
       <mesh position={[0, cabinetHeight / 2 - 0.2, 0]}>
-        <boxGeometry args={[cabinetWidth + 0.02, cabinetHeight + 0.02, cabinetDepth + 0.02]} />
+        <boxGeometry args={[cabinetWidth, cabinetHeight, cabinetDepth]} />
         <meshBasicMaterial 
-          color="#64748b" 
+          color={isSelectedCabinet ? '#f59e0b' : '#4b5563'} 
           wireframe 
           transparent 
-          opacity={0.25} 
+          opacity={isSelectedCabinet ? 0.6 : 0.25} 
         />
       </mesh>
 
-      {/* Back Panel Grid */}
-      <mesh position={[0, cabinetHeight / 2 - 0.2, -cabinetDepth / 2]}>
-        <planeGeometry args={[cabinetWidth, cabinetHeight]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.6} />
-      </mesh>
+      {/* Selection highlight for the cabinet itself */}
+      {isSelectedCabinet && (
+        <mesh position={[0, cabinetHeight / 2 - 0.2, 0]}>
+          <boxGeometry args={[cabinetWidth + 0.1, cabinetHeight + 0.1, cabinetDepth + 0.1]} />
+          <meshBasicMaterial color="#f59e0b" wireframe transparent opacity={0.3} />
+        </mesh>
+      )}
 
-      {/* Side Plates */}
-      <mesh position={[-cabinetWidth / 2, cabinetHeight / 2 - 0.2, 0]}>
-        <boxGeometry args={[0.04, cabinetHeight, cabinetDepth]} />
-        <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.5} />
-      </mesh>
-      <mesh position={[cabinetWidth / 2, cabinetHeight / 2 - 0.2, 0]}>
-        <boxGeometry args={[0.04, cabinetHeight, cabinetDepth]} />
-        <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.5} />
-      </mesh>
-
-      {/* Top Cap */}
-      <mesh position={[0, cabinetHeight - 0.2, 0]}>
+      {/* Top Cap frame bar (Clickable to select rack) */}
+      <mesh 
+        position={[0, cabinetHeight - 0.2, 0]}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelectCabinet?.();
+        }}
+      >
         <boxGeometry args={[cabinetWidth, 0.08, cabinetDepth]} />
-        <meshStandardMaterial color="#374151" metalness={0.8} roughness={0.4} />
+        <meshStandardMaterial color={isSelectedCabinet ? '#f59e0b' : '#374151'} metalness={0.8} roughness={0.4} />
       </mesh>
 
-      {/* Cabinet Frame Columns */}
+      {/* Rack structural columns (corners) - Clickable to select cabinet */}
       {[
         [-cabinetWidth/2, -cabinetDepth/2],
         [cabinetWidth/2, -cabinetDepth/2],
         [-cabinetWidth/2, cabinetDepth/2],
         [cabinetWidth/2, cabinetDepth/2]
       ].map(([x, z], i) => (
-        <mesh key={i} position={[x, cabinetHeight / 2 - 0.2, z]}>
-          <cylinderGeometry args={[0.06, 0.06, cabinetHeight, 8]} />
-          <meshStandardMaterial color="#4b5563" roughness={0.4} metalness={0.7} />
+        <mesh 
+          key={i} 
+          position={[x, cabinetHeight / 2 - 0.2, z]}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectCabinet?.();
+          }}
+        >
+          <cylinderGeometry args={[0.04, 0.04, cabinetHeight, 8]} />
+          <meshStandardMaterial color={isSelectedCabinet ? '#f59e0b' : '#374151'} roughness={0.5} metalness={0.8} />
         </mesh>
       ))}
 
@@ -106,12 +115,41 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
         </div>
       </Html>
 
-      {/* ── Render Devices (stacked vertically) ── */}
+      {/* ── Render Industrial UPS (Power Backup Unit) at Slot 0 ── */}
+      {(() => {
+        const slotHeight = 0.5;
+        const verticalSpacing = 0.62;
+        const startY = 0.5;
+        const posY = startY + 0 * verticalSpacing;
+        return (
+          <group position={[0, posY, 0]}>
+            <mesh>
+              <boxGeometry args={[2.0, slotHeight, 2.0]} />
+              <meshStandardMaterial color="#1a1a24" roughness={0.6} metalness={0.9} />
+            </mesh>
+            <mesh position={[0, 0, 1.01]}>
+              <planeGeometry args={[1.9, slotHeight - 0.08]} />
+              <meshStandardMaterial color="#09090c" roughness={0.9} />
+            </mesh>
+            <mesh position={[-0.8, 0, 1.025]}>
+              <sphereGeometry args={[0.04, 16, 16]} />
+              <meshBasicMaterial color="#10b981" toneMapped={false} />
+            </mesh>
+            <Html position={[0, 0, 1.15]} center distanceFactor={8}>
+              <div className="px-1.5 py-0.5 rounded text-[7px] font-bold tracking-wider select-none pointer-events-none bg-slate-950 text-slate-400 border border-slate-800 uppercase">
+                UPS POWER BACKUP
+              </div>
+            </Html>
+          </group>
+        );
+      })()}
+
+      {/* ── Render Devices (stacked vertically starting at Slot 1) ── */}
       {devices.map((device, idx) => {
         const slotHeight = 0.5;
         const verticalSpacing = 0.62;
         const startY = 0.5;
-        const slotIdx = device.rackSlot !== undefined ? device.rackSlot : idx;
+        const slotIdx = (device.rackSlot !== undefined ? device.rackSlot : idx) + 1;
         const posY = startY + slotIdx * verticalSpacing;
 
         const isSelected = activeDeviceId === device.id;

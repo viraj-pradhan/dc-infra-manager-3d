@@ -141,34 +141,52 @@ export const Cabling3D: React.FC<Cabling3DProps> = ({ devices, links, cabinetCou
   const verticalSpacing = 0.62;
   const startY = 0.5;
 
-  // Resolve device positions map dynamically based on role groupings or manual overrides
+  // Resolve device positions map dynamically based on role groupings or manual overrides (max 8 units per rack)
   const devicePositions = useMemo(() => {
     const map: Record<string, { cabinetIdx: number; slotIdx: number }> = {};
     const cabinetLengths = Array.from({ length: cabinetCount }, () => 0);
 
-    devices.forEach((d) => {
-      let cabIdx = d.rackCabinet;
-      if (cabIdx === undefined) {
-        switch (d.type) {
-          case 'router':        cabIdx = 0; break;
-          case 'firewall':      cabIdx = 1; break;
-          case 'load-balancer': cabIdx = 2; break;
-          case 'switch':        cabIdx = 3; break;
-          case 'server':        cabIdx = 4; break;
-          default:              cabIdx = 4;
-        }
-      }
+    let currentDefaultCabIdx = 0;
 
-      const finalCabIdx = Math.min(cabIdx, cabinetCount - 1);
-      const slotIdx = d.rackSlot !== undefined ? d.rackSlot : cabinetLengths[finalCabIdx];
+    const groupRole = (roleType: string) => {
+      const roleDevices = devices.filter(d => d.type === roleType && d.rackCabinet === undefined);
       
-      map[d.id] = {
-        cabinetIdx: finalCabIdx,
-        slotIdx: slotIdx,
-      };
+      roleDevices.forEach((d) => {
+        if (cabinetLengths[currentDefaultCabIdx] >= 8) {
+          currentDefaultCabIdx++;
+        }
+        
+        const finalCabIdx = Math.min(currentDefaultCabIdx, cabinetCount - 1);
+        map[d.id] = {
+          cabinetIdx: finalCabIdx,
+          slotIdx: cabinetLengths[finalCabIdx] + 1, // Shift slot index by 1 for bottom UPS placement
+        };
+        cabinetLengths[finalCabIdx]++;
+      });
       
-      cabinetLengths[finalCabIdx]++;
+      if (roleDevices.length > 0) {
+        currentDefaultCabIdx++;
+      }
+    };
+
+    // First map all devices that have manual overrides
+    devices.forEach((d) => {
+      if (d.rackCabinet !== undefined) {
+        const finalCabIdx = Math.min(d.rackCabinet, cabinetCount - 1);
+        const slotIdx = d.rackSlot !== undefined ? d.rackSlot : cabinetLengths[finalCabIdx];
+        map[d.id] = {
+          cabinetIdx: finalCabIdx,
+          slotIdx: slotIdx + 1, // Shift slot index by 1 for bottom UPS placement
+        };
+        cabinetLengths[finalCabIdx]++;
+      }
     });
+
+    groupRole('router');
+    groupRole('firewall');
+    groupRole('load-balancer');
+    groupRole('switch');
+    groupRole('server');
 
     return map;
   }, [devices, cabinetCount]);
