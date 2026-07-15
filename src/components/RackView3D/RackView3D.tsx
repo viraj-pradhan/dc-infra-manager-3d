@@ -20,7 +20,8 @@ export const RackView3D: React.FC = () => {
     addLink,
     deleteLink,
     cabinetCount,
-    addRack
+    addRack,
+    deleteRack
   } = useTopologyStore();
 
   const devices3D = useMemo(() => {
@@ -31,47 +32,63 @@ export const RackView3D: React.FC = () => {
     return links;
   }, [links]);
 
-  interface CabinetData {
-    role: string;
-    label: string;
-    devices: typeof devices;
-  }
 
-  // Group devices into cabinets dynamically by role type with a limit of 10 units per cabinet
+
+  // Group devices into cabinets dynamically based on role or manual overrides
   const cabinets = useMemo(() => {
-    const list: CabinetData[] = [];
+    const list: typeof devices[] = Array.from({ length: cabinetCount }, () => []);
 
-    const groupRole = (roleType: string, displayLabel: string) => {
-      const filtered = devices.filter(d => d.type === roleType);
-      if (filtered.length === 0) return;
-
-      for (let i = 0; i < filtered.length; i += 10) {
-        const chunk = filtered.slice(i, i + 10);
-        const devicesWithSlots = chunk.map((d, slotIdx) => ({
-          ...d,
-          rackSlot: slotIdx,
-        }));
-        
-        const cabinetNumber = Math.floor(i / 10) + 1;
-        const finalLabel = filtered.length > 10 ? `${displayLabel} ${cabinetNumber}` : displayLabel;
-        
-        list.push({
-          role: roleType,
-          label: finalLabel,
-          devices: devicesWithSlots,
-        });
+    devices.forEach((d) => {
+      let cabIdx = d.rackCabinet;
+      if (cabIdx === undefined) {
+        switch (d.type) {
+          case 'router':        cabIdx = 0; break;
+          case 'firewall':      cabIdx = 1; break;
+          case 'load-balancer': cabIdx = 2; break;
+          case 'switch':        cabIdx = 3; break;
+          case 'server':        cabIdx = 4; break;
+          default:              cabIdx = 4;
+        }
       }
-    };
 
-    // Fixed logical order: Core Routers -> Firewalls -> Load Balancers -> Switches -> Servers
-    groupRole('router', 'CORE ROUTERS');
-    groupRole('firewall', 'FIREWALLS');
-    groupRole('load-balancer', 'LOAD BALANCERS');
-    groupRole('switch', 'SWITCHES');
-    groupRole('server', 'SERVERS');
+      const finalCabIdx = Math.min(cabIdx, cabinetCount - 1);
+      const slotIdx = d.rackSlot !== undefined ? d.rackSlot : list[finalCabIdx].length;
 
-    return list;
-  }, [devices]);
+      if (finalCabIdx >= 0 && finalCabIdx < cabinetCount) {
+        list[finalCabIdx].push({ ...d, rackSlot: slotIdx });
+      }
+    });
+
+    list.forEach(cab => {
+      cab.sort((a, b) => (a.rackSlot ?? 0) - (b.rackSlot ?? 0));
+    });
+
+    // Helper to assign a clean dominant label to each cabinet
+    return list.map((cabDevices, idx) => {
+      let label = `RACK CABINET ${idx + 1}`;
+      if (cabDevices.length > 0) {
+        const types = cabDevices.map(d => d.type);
+        const mostCommonType = types.reduce((a, b, i, arr) => 
+          arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b
+        );
+        switch (mostCommonType) {
+          case 'router':        label = 'CORE ROUTERS'; break;
+          case 'firewall':      label = 'FIREWALLS'; break;
+          case 'load-balancer': label = 'LOAD BALANCERS'; break;
+          case 'switch':        label = 'SWITCHES'; break;
+          case 'server':        label = `SERVERS ${idx + 1}`; break;
+          default:              label = `RACK CABINET ${idx + 1}`;
+        }
+      } else {
+        label = `RACK CABINET ${idx + 1} (EMPTY)`;
+      }
+
+      return {
+        devices: cabDevices,
+        label,
+      };
+    });
+  }, [devices, cabinetCount]);
 
   // Selected device for the overlay panel
   const activeDevice = useMemo(() => {
@@ -142,7 +159,7 @@ export const RackView3D: React.FC = () => {
           ))}
 
           {/* Inter-rack patching cords */}
-          <Cabling3D devices={devices3D} links={links3D} />
+          <Cabling3D devices={devices3D} links={links3D} cabinetCount={cabinetCount} />
         </group>
 
         {/* Orbit Camera controls */}
@@ -163,6 +180,23 @@ export const RackView3D: React.FC = () => {
           <span>Drag to rotate • Scroll to zoom • Click unit to view details</span>
         </div>
         
+        <div className="flex gap-2 pointer-events-auto">
+          <button
+            onClick={addRack}
+            className="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-xl border border-blue-500/20 shadow-lg transition duration-150 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Server className="w-3.5 h-3.5" />
+            <span>Add Cabinet</span>
+          </button>
+          <button
+            onClick={deleteRack}
+            disabled={cabinetCount <= 1}
+            className="bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-2 rounded-xl border border-red-500/20 shadow-lg transition duration-150 flex items-center gap-1.5 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Delete Cabinet</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Selected Device Detail Card ── */}
@@ -245,7 +279,68 @@ export const RackView3D: React.FC = () => {
               </div>
             </div>
 
-
+            {/* Rack Placement Controls */}
+            {activeDevice && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-wider block">Rack Placement</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-1">Cabinet</label>
+                    <select
+                      value={activeDevice.rackCabinet !== undefined ? activeDevice.rackCabinet : (() => {
+                        switch (activeDevice.type) {
+                          case 'router': return 0;
+                          case 'firewall': return 1;
+                          case 'load-balancer': return 2;
+                          case 'switch': return 3;
+                          case 'server': return 4;
+                          default: return 4;
+                        }
+                      })()}
+                      onChange={(e) => {
+                        const cabIdx = parseInt(e.target.value, 10);
+                        const slotIdx = activeDevice.rackSlot !== undefined ? activeDevice.rackSlot : 0;
+                        moveDeviceInRack(activeDevice.id, cabIdx, slotIdx);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      {cabinets.map((_, idx) => (
+                        <option key={idx} value={idx}>
+                          Rack {idx + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-1">Slot Position</label>
+                    <select
+                      value={activeDevice.rackSlot !== undefined ? activeDevice.rackSlot : 0}
+                      onChange={(e) => {
+                        const slotIdx = parseInt(e.target.value, 10);
+                        const cabIdx = activeDevice.rackCabinet !== undefined ? activeDevice.rackCabinet : (() => {
+                          switch (activeDevice.type) {
+                            case 'router': return 0;
+                            case 'firewall': return 1;
+                            case 'load-balancer': return 2;
+                            case 'switch': return 3;
+                            case 'server': return 4;
+                            default: return 4;
+                          }
+                        })();
+                        moveDeviceInRack(activeDevice.id, cabIdx, slotIdx);
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      {Array.from({ length: 10 }).map((_, idx) => (
+                        <option key={idx} value={idx}>
+                          Unit {idx + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Topology Editing (Manage Links) in 3D */}
             <div className="pt-3 border-t border-slate-800 space-y-2">

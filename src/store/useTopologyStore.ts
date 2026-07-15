@@ -24,6 +24,7 @@ interface TopologyState {
   moveDeviceInRack: (id: string, targetCabinet: number, targetSlot: number) => void;
   cabinetCount: number;
   addRack: () => void;
+  deleteRack: () => void;
 }
 
 // Reachability/Cascade Connectivity Simulation Logic
@@ -247,5 +248,6 @@ export const useTopologyStore = create<TopologyState>((set) => {
 
     cabinetCount: 3,
     addRack: () => set((state) => ({ cabinetCount: state.cabinetCount + 1 })),
+    deleteRack: () => set((state) => ({ cabinetCount: Math.max(1, state.cabinetCount - 1) })),
   };
 });

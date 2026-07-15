@@ -6,10 +6,7 @@ import { Line } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-interface Cabling3DProps {
-  devices: Device[];
-  links: Link[];
-}
+
 
 interface CableLineProps {
   link: Link;
@@ -133,40 +130,48 @@ const CableLine: React.FC<CableLineProps> = ({ link, startPos, endPos, srcDev, t
   );
 };
 
-export const Cabling3D: React.FC<Cabling3DProps> = ({ devices, links }) => {
+interface Cabling3DProps {
+  devices: Device[];
+  links: Link[];
+  cabinetCount: number;
+}
+
+export const Cabling3D: React.FC<Cabling3DProps> = ({ devices, links, cabinetCount }) => {
   const spacingBetweenRacks = 4.5;
   const verticalSpacing = 0.62;
   const startY = 0.5;
 
-  // Resolve device positions map dynamically based on role groupings
+  // Resolve device positions map dynamically based on role groupings or manual overrides
   const devicePositions = useMemo(() => {
     const map: Record<string, { cabinetIdx: number; slotIdx: number }> = {};
-    let currentCabinetIndex = 0;
+    const cabinetLengths = Array.from({ length: cabinetCount }, () => 0);
 
-    const mapRole = (roleType: string) => {
-      const filtered = devices.filter(d => d.type === roleType);
-      if (filtered.length === 0) return;
-
-      for (let i = 0; i < filtered.length; i += 10) {
-        const chunk = filtered.slice(i, i + 10);
-        chunk.forEach((d, slotIdx) => {
-          map[d.id] = {
-            cabinetIdx: currentCabinetIndex,
-            slotIdx: slotIdx,
-          };
-        });
-        currentCabinetIndex++;
+    devices.forEach((d) => {
+      let cabIdx = d.rackCabinet;
+      if (cabIdx === undefined) {
+        switch (d.type) {
+          case 'router':        cabIdx = 0; break;
+          case 'firewall':      cabIdx = 1; break;
+          case 'load-balancer': cabIdx = 2; break;
+          case 'switch':        cabIdx = 3; break;
+          case 'server':        cabIdx = 4; break;
+          default:              cabIdx = 4;
+        }
       }
-    };
 
-    mapRole('router');
-    mapRole('firewall');
-    mapRole('load-balancer');
-    mapRole('switch');
-    mapRole('server');
+      const finalCabIdx = Math.min(cabIdx, cabinetCount - 1);
+      const slotIdx = d.rackSlot !== undefined ? d.rackSlot : cabinetLengths[finalCabIdx];
+      
+      map[d.id] = {
+        cabinetIdx: finalCabIdx,
+        slotIdx: slotIdx,
+      };
+      
+      cabinetLengths[finalCabIdx]++;
+    });
 
     return map;
-  }, [devices]);
+  }, [devices, cabinetCount]);
 
   // Helper to resolve device 3D position
   const getDevicePos = (id: string): [number, number, number] | null => {
