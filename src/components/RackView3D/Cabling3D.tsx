@@ -58,24 +58,42 @@ const CableLine: React.FC<CableLineProps> = ({ link, startPos, endPos, srcDev, t
     }
   }
 
-  // Create a clean path routing curves (sag/catenary effect)
+  // Create a clean structured routing path (no messy sags)
   const curve = useMemo(() => {
     const vStart = new THREE.Vector3(...startPos);
     const vEnd = new THREE.Vector3(...endPos);
-    
-    // Calculate a structured routing midpoint to look neat
-    const midPoint = new THREE.Vector3(
-      (startPos[0] + endPos[0]) / 2,
-      Math.min(startPos[1], endPos[1]) - 0.4,
-      (startPos[2] + endPos[2]) / 2 - 0.2
-    );
-    
-    return new THREE.QuadraticBezierCurve3(vStart, midPoint, vEnd);
+    const xa = startPos[0];
+    const ya = startPos[1];
+    const xb = endPos[0];
+    const yb = endPos[1];
+    const sameCabinet = Math.abs(xa - xb) < 0.1;
+
+    if (sameCabinet) {
+      // In-rack routing: curve out to the right side of the rack and run vertically
+      const pointsList = [
+        vStart,
+        new THREE.Vector3(xa + 0.9, ya, -0.9),
+        new THREE.Vector3(xa + 0.9, yb, -0.9),
+        vEnd
+      ];
+      return new THREE.CatmullRomCurve3(pointsList, false, 'centripetal', 0.15);
+    } else {
+      // Inter-rack routing: go to back spine, run overhead at y=7.5, drop down at target rack
+      const pointsList = [
+        vStart,
+        new THREE.Vector3(xa, ya, -1.3),
+        new THREE.Vector3(xa, 7.5, -1.3),
+        new THREE.Vector3(xb, 7.5, -1.3),
+        new THREE.Vector3(xb, yb, -1.3),
+        vEnd
+      ];
+      return new THREE.CatmullRomCurve3(pointsList, false, 'centripetal', 0.1);
+    }
   }, [startPos, endPos]);
 
-  // Points for rendering the Line component
+  // Points for rendering the Line component (higher subdivisions for smooth curves)
   const linePoints = useMemo(() => {
-    return curve.getPoints(20);
+    return curve.getPoints(32);
   }, [curve]);
 
   const packetRef = useRef<THREE.Mesh>(null);
@@ -116,23 +134,49 @@ const CableLine: React.FC<CableLineProps> = ({ link, startPos, endPos, srcDev, t
 };
 
 export const Cabling3D: React.FC<Cabling3DProps> = ({ devices, links }) => {
-  // Spacing constants (must match RackCabinet.tsx exactly)
   const spacingBetweenRacks = 4.5;
   const verticalSpacing = 0.62;
   const startY = 0.5;
 
+  // Resolve device positions map dynamically based on role groupings
+  const devicePositions = useMemo(() => {
+    const map: Record<string, { cabinetIdx: number; slotIdx: number }> = {};
+    let currentCabinetIndex = 0;
+
+    const mapRole = (roleType: string) => {
+      const filtered = devices.filter(d => d.type === roleType);
+      if (filtered.length === 0) return;
+
+      for (let i = 0; i < filtered.length; i += 10) {
+        const chunk = filtered.slice(i, i + 10);
+        chunk.forEach((d, slotIdx) => {
+          map[d.id] = {
+            cabinetIdx: currentCabinetIndex,
+            slotIdx: slotIdx,
+          };
+        });
+        currentCabinetIndex++;
+      }
+    };
+
+    mapRole('router');
+    mapRole('firewall');
+    mapRole('load-balancer');
+    mapRole('switch');
+    mapRole('server');
+
+    return map;
+  }, [devices]);
+
   // Helper to resolve device 3D position
   const getDevicePos = (id: string): [number, number, number] | null => {
-    const dev = devices.find(d => d.id === id);
-    if (!dev) return null;
+    const pos = devicePositions[id];
+    if (!pos) return null;
 
-    const cabinetIdx = dev.rackCabinet !== undefined ? dev.rackCabinet : Math.floor(devices.indexOf(dev) / 10);
-    const slotIdx = dev.rackSlot !== undefined ? dev.rackSlot : devices.indexOf(dev) % 10;
-
-    const posX = cabinetIdx * spacingBetweenRacks;
-    const posY = startY + slotIdx * verticalSpacing;
+    const posX = pos.cabinetIdx * spacingBetweenRacks;
+    const posY = startY + pos.slotIdx * verticalSpacing;
     
-    // Connect cables to the back side of the chassis (z = -0.9) to mimic real cables
+    // Connect cables to the back side of the chassis (z = -0.9)
     return [posX, posY, -0.9];
   };
 

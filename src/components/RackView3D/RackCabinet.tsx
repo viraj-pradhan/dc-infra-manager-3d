@@ -9,6 +9,7 @@ interface RackCabinetProps {
   cabinetIndex: number;
   activeDeviceId: string | null;
   setActiveDeviceId: (id: string | null) => void;
+  label: string;
 }
 
 export const RackCabinet: React.FC<RackCabinetProps> = ({
@@ -16,6 +17,7 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
   cabinetIndex,
   activeDeviceId,
   setActiveDeviceId,
+  label,
 }) => {
   // Spacing in 3D scene
   const cabinetWidth = 2.4;
@@ -77,8 +79,8 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
 
       {/* Cabinet Label */}
       <Html position={[0, cabinetHeight + 0.3, 0]} center>
-        <div className="bg-slate-900/90 backdrop-blur-sm text-slate-200 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-700 shadow-md whitespace-nowrap">
-          RACK CABINET {cabinetIndex + 1}
+        <div className="bg-slate-900/90 backdrop-blur-sm text-slate-200 text-[10px] font-bold px-3 py-1 rounded-full border border-slate-700 shadow-md whitespace-nowrap uppercase tracking-wider">
+          {label}
         </div>
       </Html>
 
@@ -96,8 +98,6 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
         const deviceColor = getTypeColor(device.type);
         const statusColor = getStatusColor(device.status);
 
-        const isFirewall = device.type === 'firewall';
-
         return (
           <group 
             key={device.id} 
@@ -107,46 +107,29 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
               setActiveDeviceId(isSelected ? null : device.id);
             }}
           >
-            {/* 3D Box representing the device: Solid for hardware, thin wireframe/indicator for software-only Firewall */}
-            {!isFirewall ? (
-              <>
-                <mesh>
-                  <boxGeometry args={[2.0, slotHeight, 2.0]} />
-                  <meshStandardMaterial 
-                    color={deviceColor} 
-                    roughness={0.4} 
-                    metalness={0.5} 
-                    emissive={isSelected ? '#3b82f6' : '#000000'}
-                    emissiveIntensity={isSelected ? 0.3 : 0}
-                  />
-                </mesh>
+            {/* 3D Box representing the device: Solid hardware chassis */}
+            <mesh>
+              <boxGeometry args={[2.0, slotHeight, 2.0]} />
+              <meshStandardMaterial 
+                color={deviceColor} 
+                roughness={0.4} 
+                metalness={0.5} 
+                emissive={isSelected ? '#3b82f6' : '#000000'}
+                emissiveIntensity={isSelected ? 0.3 : 0}
+              />
+            </mesh>
 
-                {/* Front Panel details (metal accent faceplate) */}
-                <mesh position={[0, 0, 1.01]}>
-                  <planeGeometry args={[1.9, slotHeight - 0.05]} />
-                  <meshStandardMaterial color="#111827" roughness={0.9} />
-                </mesh>
+            {/* Front Panel details (metal accent faceplate) */}
+            <mesh position={[0, 0, 1.01]}>
+              <planeGeometry args={[1.9, slotHeight - 0.05]} />
+              <meshStandardMaterial color="#111827" roughness={0.9} />
+            </mesh>
 
-                {/* Small stylized grid vents on front faceplate */}
-                <mesh position={[0.1, 0, 1.02]}>
-                  <planeGeometry args={[1.2, 0.15]} />
-                  <meshBasicMaterial color="#374151" />
-                </mesh>
-              </>
-            ) : (
-              // Software Firewall: Render a thin, translucent boundary frame
-              <mesh>
-                <boxGeometry args={[2.0, 0.08, 2.0]} />
-                <meshStandardMaterial 
-                  color="#f43f5e" 
-                  roughness={0.9} 
-                  metalness={0.1} 
-                  transparent 
-                  opacity={0.4}
-                  wireframe
-                />
-              </mesh>
-            )}
+            {/* Small stylized grid vents on front faceplate */}
+            <mesh position={[0.1, 0, 1.02]}>
+              <planeGeometry args={[1.2, 0.15]} />
+              <meshBasicMaterial color="#374151" />
+            </mesh>
 
             {/* Selection highlight frame */}
             {isSelected && (
@@ -157,7 +140,7 @@ export const RackCabinet: React.FC<RackCabinetProps> = ({
             )}
 
             {/* Status LED Sphere */}
-            <mesh position={[-0.8, isFirewall ? 0 : 0, 1.03]}>
+            <mesh position={[-0.8, 0, 1.03]}>
               <sphereGeometry args={[0.07, 16, 16]} />
               <meshBasicMaterial color={statusColor} />
             </mesh>
